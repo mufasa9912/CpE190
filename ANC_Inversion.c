@@ -97,6 +97,7 @@ int main(){
 	//Pa_Sleep(5*1000); //5 second sleep
 	//printf("Enter any key to end the progam\n");
 	//getchar();
+	while(Pa_IsActive(stream));
 	
 	err = Pa_StopStream(stream); //Pa_AbortStream() is an option too
 	if(err != paNoError) goto error;
