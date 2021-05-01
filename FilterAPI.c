@@ -1,50 +1,230 @@
-#include "SpeakerAPI.h"
-#include "MicrophoneAPI.h"
-#include <stdlib.h>
 #include <stdio.h>
-int main (void)
+#include <stdlib.h>
+#include <string.h>
+#include "portaudio.h"
+#include "pa_linux_alsa.h"
+#include "FilterAPI.h"
+#define FRAMES_PER_BUFFER 512
+#define NUM_OF_CHANNELS 2
+#define SAMPLE_RATE 44100
+#define LENGTH_OF_SAMPLES 5 //Number of Seconds
+
+static paTestFreq data;
+static PaDeviceInfo device;
+
+int main()
 {
-   //Frequency Detection Function
-   //Decible Detection Funtion
-   //Push Signal to the Speaker API at proper Decible
+    printf("Frequency Data Capture Program Initializing");
+    paTestFreq data;
+    PaStreamParameters inputParameters, outputParameters;
+    PaStream *stream;
+    PaError err;
+    int i, totalFrames, totalSamples, numOfBytes, avgFreq, sampIndex;
+    FILE *file;
+
+    err = Pa_Initialize();
+    if(err != paNoError) 
+        goto error;
+    
+    //IO Device Declaration
+    inputParameters.device = Pa_GetDefaultInputDevice();
+    if(inputParameters.device == paNoDevice)
+    {
+        printf("Input Device Not Found.\n");
+        goto error;
+    }
+    outputParameters.device = Pa_GetDefualtOutputDevice();
+    if(outputParameters.device == paNoDevice)
+    {
+        printf("Output device could not be found.\n");
+        goto error;
+    }
+
+    //IO Device Setup
+    inputParameters.sampleFormat = paFloat32;
+    outputParameters.sampleFormat = paFloat32;
+    inputParameters.channelCount = NUM_OF_CHANNELS;
+    outputParameters.channelCount = NUM_OF_CHANNELS;
+    inputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowOutputLatency;
+
+    //Data Inialization
+    data.avgFreq = 0;
+    data.outputIndex = 0;
+    data.frameIndex = 0;
+    data.lastValue = 0;
+    data.freqIndex1 = 0;
+    data.freqIndex2 = 0;
+    data.maxFrameIndex = SAMPLE_RATE * LENGTH_OF_SAMPLES;
+    totalFrames = data.maxFrameIndex;
+    totalSamples = totalFrames * NUM_OF_CHANNELS;
+    numOfBytes = sizeof(SAMPLE) * totalSamples;
+    data.audioArray = (SAMPLE *) malloc(numberOfBytes);
+    if(data.audioArray == NULL)
+    {
+        printf("\naudioArray could not be initialized");
+        free(data.audioArray);
+        return -1;
+    }
+    memset(data.audioArray, 0.0f, totalSamples);
+    data.frequencyArray = (SAMPLE *) malloc(numberOfBytes);
+    if(data.frequencyArray == NULL)
+    {
+        printf("\nfrequencyArray could not be initialized");
+        free(data.frequencyArray);
+        return -1;
+    }
+    memset(data.frequencyArray,0.0f,totalSamples);
+    
+    //Init
+    file = fopen("_audioArrayInit.raw","wb");
+    if(file == NULL)
+        printf("Could not record to 'audioArrayInit.raw'");
+    else
+    {
+        fwrite(data.audioArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+		fclose(file);
+		printf("Wrote raw empty audio data to '_audioArrayInit.raw'\n");
+    }
+    file = fopen("_freqArrayInit.csv","wb");
+    if(file == NULL)
+        printf("Could not record to 'freqArrayInit.csv'");
+    else
+    {
+        fwrite(data.freqArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+		fclose(file);
+		printf("Wrote raw empty audio data to 'freqArrayInit.csv'\n");
+    }
+    err = Pa_OpenStream(&stream, &inputParameters, NULL, SAMPLE_RATE,
+                        FRAMES_PER_BUFFER, paClipOff, paTestCallBack,
+                        &data);
+    if(err != paNoError)
+        goto error;
+    PaAlsa_EnableRealtimeScheduling(stream, 1);
+	err = Pa_StartStream(stream);
+	if(err != paNoError) 
+        goto error
+    while(Pa_IsStreamActive(stream));
+    err = Pa_StopStream(stream);
+    if(err != paNoError)
+        goto error;
+    err = Pa_CloseStream(stream);
+    if(err != paNoError)
+        goto error;
+
+    file = fopen("audioArray.raw","wb");
+    if(file == NULL)
+        printf("Could not open file\n");
+	else 
+    {
+	    fwrite(data.audioArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+		fclose(file);
+		printf("Wrote raw audio data to 'audioArray.raw'\n");
+
+    file = fopen("freqArray.csv","wb");
+    if(file == NULL)
+        printf("Could not open file\n");
+	else 
+    {
+	    fwrite(data.freqArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+		fclose(file);
+		printf("Wrote raw audio data to 'freqArray.csv'\n");
+
+    free(data.audioArray);
+    free(data.freqArray);
+    Pa_Terminate();
+    if(err != paNoError)
+        goto error;
+
+    printf("Ending Stream\n");
+    return 0;
+
+    error:
+        if(stream)
+        { 
+            Pa_AbortStream(stream); 
+            Pa_CloseStream(stream);
+        }
+	    free(data.recordArray);
+        free(data.recordArrayInverse);
+	    Pa_Terminate();
+        fprintf( stderr, "An error occurred while using the portaudio stream\n" );
+        fprintf( stderr, "Error number: %d\n", err );
+        fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
+        return -1;
 }
 
-int freqDet(int inFreq)
+paTestCallBack(const void *inputBuffer, void *outputBuffer,
+               unsigned long framesPerBuffer,
+               const PaStreamCallbackTimeInfo* timeInfo,
+               PaStreamCallbackFlags statusFlags,
+               void *userData )
 {
-    //Basic PseudoCode
+    (void) outputBuffer;
+    (void) timeInfo;
+    (void) statusFlags;
+    (void) userData;
 
-    //Input frequency variable inFreq
+    int done = paContinue;
+    paTestFreq *data = (paTestFreq*) userData;
+    const SAMPLE *readPointer = (const SAMPLE*) inputBuffer;
+    SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * CHANNEL_COUNT]; 
+    SAMPLE *writePointerFreqArray = &data->frequencyArray[data -> frameIndex * CHANNEL_COUNT]; 
 
-    //If in freq > 500 and less than 1500
-        //If multiple inputs say maybe 10 if inputs are at 1ms are within 
-        //that range hand off to machine learning to determine if indeed 
-        //siren.
-            //If Siren == true
-                //Do nothing
-            //Else
-                //Signal to the ANC API to phase shift
-        //ELse
-            //Do nothing
-    //Else if in freq > 3000 and less than 4000
-        //If multiple inputs say maybe 10 if inputs are at 1ms are within 
-        //that range hand off to machine learning to determine if indeed 
-        //siren.
-            //If Siren == true
-                //Do nothing
-            //Else
-                //Signal to the ANC API to phase shift
-        //ELse
-            //Do nothing
-    //Else
-        //Do nothing
+    long i, j, framesToCalculate;
+	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex)
 
-}
+    if(remainingFrames < framesPerBuffer)
+    {
+		framesToCalculate = remainingFrames;
+		done = paComplete;
+	}
+	else
+    {
+		framesToCalculate = framesPerBuffer;
+		done = paContinue;
+	}
 
-int decDet(int inDec)
-{
-    //Basic PsedoCode
+    if(inputBuffer == NULL)
+    {
+        for(i = 0;i<framesToCalculate; i++)
+        {
+            for(j = 0;j<NUM_OF_CHANNELS; j++)
+            {
+                *writePointerAudioArray++ = SAMPLE_SILENCE;
+                *writePointerFreqArray++ = SAMPLE_SILENCE;
+            }
+        }
+    }
 
-    //Input Decible variable inDec
-
-    //return inDec
+    //Frequency Calculations
+    for(i = 0; i < framesToCalculate; i++)
+    {
+        for(j = 0; j < NUM_OF_CHANNELS; j++)
+        {
+            if(i == 0) //Initailize the freq indexes
+            {    
+                data.freqVal1 = audioArray[0];
+                data.freqIndex1 = 0;
+            }
+            else if(data.freqVal1 > 0 && audioArray[i] < 0) //from pos to neg
+            {
+                data.freqVal2 = audioArray[i];
+                data.freqIndex2 = i;
+                data.currFreq = 2*(data.freqIndex2 - data.freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+            }
+            else if(data.freqVal2 < 0 && audioArray[i]>0) //from neg to pos
+            {
+                data.freqVal1 = audioArray[i];
+                data.freqIndex1 = i;
+                data.currFreq = 2*(data.freqIndex1 - data.freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+            }
+            readPointerHolder = readPointer++;
+            *writePointerAudioArray++ = *readPointerHolder;
+        }
+    }
+    data -> frameIndex = (data -> frameIndex) + framesToCalculate;
+    return done;
 }
