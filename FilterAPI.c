@@ -51,12 +51,12 @@ int main()
     outputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowOutputLatency;
 
     //Data Inialization
-    data.avgFreq = 0;
-    data.outputIndex = 0;
     data.frameIndex = 0;
-    data.lastValue = 0;
+    data.currFreq = 0;
     data.freqIndex1 = 0;
     data.freqIndex2 = 0;
+    data.freqVal1 = 0;
+    data.freqVal2 = 0;
     data.maxFrameIndex = SAMPLE_RATE * LENGTH_OF_SAMPLES;
     totalFrames = data.maxFrameIndex;
     totalSamples = totalFrames * NUM_OF_CHANNELS;
@@ -222,7 +222,8 @@ paTestCallBack(const void *inputBuffer, void *outputBuffer,
                 data.currFreq = 2*(data.freqIndex1 - data.freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
             }
             readPointerHolder = readPointer++;
-            *writePointerAudioArray++ = *readPointerHolder;
+            *writePointerAudioArray++ = *readPointerHolder; // Audio feedthrough
+            *writePointerFreqArray++ = *readPointerHolder; //IDK how to do the frequency write back. is it currFreq???
         }
     }
     data -> frameIndex = (data -> frameIndex) + framesToCalculate;
