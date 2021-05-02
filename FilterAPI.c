@@ -122,7 +122,7 @@ int main()
 	    fwrite(data.audioArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw audio data to 'audioArray.raw'\n");
-
+    }
     file = fopen("frequencyArray.csv","wb");
     if(file == NULL)
         printf("Could not open file\n");
