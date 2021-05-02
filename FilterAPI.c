@@ -69,7 +69,7 @@ int main()
         return -1;
     }
     memset(data.audioArray, 0.0f, totalSamples);
-    data.frequencyArray = (SAMPLE *) malloc(numberOfBytes);
+    data.frequencyArray = (SAMPLE *) malloc(numOfBytes);
     if(data.frequencyArray == NULL)
     {
         printf("\nfrequencyArray could not be initialized");
@@ -93,7 +93,7 @@ int main()
         printf("Could not record to 'frequencyArrayInit.csv'");
     else
     {
-        fwrite(data.frequencyArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+        fwrite(data.frequencyArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw empty audio data to 'frequencyArrayInit.csv'\n");
     }
@@ -105,7 +105,7 @@ int main()
     PaAlsa_EnableRealtimeScheduling(stream, 1);
 	err = Pa_StartStream(stream);
 	if(err != paNoError) 
-        goto error
+        goto error;
     while(Pa_IsStreamActive(stream));
     err = Pa_StopStream(stream);
     if(err != paNoError)
@@ -147,8 +147,8 @@ int main()
             Pa_AbortStream(stream); 
             Pa_CloseStream(stream);
         }
-	    free(data.recordArray);
-        free(data.recordArrayInverse);
+	    free(data.audioArray);
+        free(data.frequencyArray);
 	    Pa_Terminate();
         fprintf( stderr, "An error occurred while using the portaudio stream\n" );
         fprintf( stderr, "Error number: %d\n", err );
@@ -160,8 +160,7 @@ paTestCallBack(const void *inputBuffer, void *outputBuffer,
                unsigned long framesPerBuffer,
                const PaStreamCallbackTimeInfo* timeInfo,
                PaStreamCallbackFlags statusFlags,
-               void *userData )
-{
+               void *userData){
     (void) outputBuffer;
     (void) timeInfo;
     (void) statusFlags;
