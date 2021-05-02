@@ -128,8 +128,13 @@ int main()
         printf("Could not open file\n");
 	else 
     {
-	    fwrite(data.frequencyArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
-		fclose(file);
+	    //fwrite(data.frequencyArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
+		for(i = 0; i< totalFrames; i++)
+        {
+            fprintf(file, "SampleNum, Frequencies");
+            fprintf(file,"%d,%d\n",data.frameIndex, data.currFreq);
+        }
+        fclose(file);
 		printf("Wrote raw audio data to 'frequencyArray.csv'\n");
     }
     free(data.audioArray);
