@@ -131,7 +131,7 @@ int main()
 	    fwrite(data.frequencyArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw audio data to 'frequencyArray.csv'\n");
-
+    }
     free(data.audioArray);
     free(data.frequencyArray);
     Pa_Terminate();
@@ -157,10 +157,10 @@ int main()
 }
 
 static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
-               unsigned long framesPerBuffer,
-               const PaStreamCallbackTimeInfo* timeInfo,
-               PaStreamCallbackFlags statusFlags,
-               void *userData)
+                            unsigned long framesPerBuffer,
+                            const PaStreamCallbackTimeInfo* timeInfo,
+                            PaStreamCallbackFlags statusFlags,
+                            void *userData)
 {
     (void) outputBuffer;
     (void) timeInfo;
@@ -219,7 +219,7 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
                 }
                 else if(data->freqVal2 < 0 && readPointerHolder>0) //from neg to pos ISSUE
                 {
-                    data->freqVal1 = audioArray[i]; //POSSIBLE ISSUE
+                    data->freqVal1 = readPointerHolder; //POSSIBLE ISSUE
                     data->freqIndex1 = i;
                     data->currFreq = 2*(data->freqIndex1 - data->freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
                 }
@@ -230,5 +230,4 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
     }
     data -> frameIndex = (data -> frameIndex) + framesToCalculate;
     return done;
-    
 }
