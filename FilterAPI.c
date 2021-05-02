@@ -172,7 +172,7 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
     const SAMPLE *readPointer = (const SAMPLE*) inputBuffer;
     SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * NUM_OF_CHANNELS]; 
     SAMPLE *writePointerfrequencyArray = &data->frequencyArray[data -> frameIndex * NUM_OF_CHANNELS]; 
-
+    SAMPLE readPointerHolder;
     long i, j, framesToCalculate;
 	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex);
 
@@ -198,32 +198,34 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
             }
         }
     }
-
-    //Frequency Calculations
-    for(i = 0; i < framesToCalculate; i++)
+    else
     {
-        for(j = 0; j < NUM_OF_CHANNELS; j++)
+        //Frequency Calculations
+        for(i = 0; i < framesToCalculate; i++)
         {
-            if(i == 0) //Initailize the freq indexes
-            {    
-                data->freqVal1 = audioArray[0];
-                data->freqIndex1 = 0;
-            }
-            else if(data->freqVal1 > 0 && audioArray[i] < 0) //from pos to neg ISSUE
+            for(j = 0; j < NUM_OF_CHANNELS; j++)
             {
-                data->freqVal2 = audioArray[i];
-                data->freqIndex2 = i;
-                data->currFreq = 2*(data->freqIndex2 - data->freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+                readPointerHolder = readPointer++;
+                if(i == 0) //Initailize the freq indexes
+                {    
+                    data->freqVal1 = readPointerHolder;
+                    data->freqIndex1 = 0;
+                }
+                else if(data->freqVal1 > 0 && readPointerHolder < 0) //from pos to neg ISSUE
+                {
+                    data->freqVal2 = readPointerHolder;
+                    data->freqIndex2 = i;
+                    data->currFreq = 2*(data->freqIndex2 - data->freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+                }
+                else if(data->freqVal2 < 0 && readPointerHolder>0) //from neg to pos ISSUE
+                {
+                    data->freqVal1 = audioArray[i]; //POSSIBLE ISSUE
+                    data->freqIndex1 = i;
+                    data->currFreq = 2*(data->freqIndex1 - data->freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+                }
+                *writePointerAudioArray++ = *readPointerHolder; // Audio feedthrough
+                *writePointerfrequencyArray++ = data->currFreq; //IDK how to do the frequency write back. is it currFreq??
             }
-            else if(data->freqVal2 < 0 && audioArray[i]>0) //from neg to pos ISSUE
-            {
-                data->freqVal1 = audioArray[i]; //POSSIBLE ISSUE
-                data->freqIndex1 = i;
-                data->currFreq = 2*(data->freqIndex1 - data->freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
-            }
-            readPointerHolder = readPointer++;
-            *writePointerAudioArray++ = *readPointerHolder; // Audio feedthrough
-            *writePointerfrequencyArray++ = *readPointerHolder; //IDK how to do the frequency write back. is it currFreq???
         }
     }
     data -> frameIndex = (data -> frameIndex) + framesToCalculate;
