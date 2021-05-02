@@ -33,7 +33,7 @@ int main()
         printf("Input Device Not Found.\n");
         goto error;
     }
-    outputParameters.device = Pa_GetDefualtOutputDevice();
+    outputParameters.device = Pa_GetDefaultOutputDevice();
     if(outputParameters.device == paNoDevice)
     {
         printf("Output device could not be found.\n");
@@ -61,7 +61,7 @@ int main()
     totalFrames = data.maxFrameIndex;
     totalSamples = totalFrames * NUM_OF_CHANNELS;
     numOfBytes = sizeof(SAMPLE) * totalSamples;
-    data.audioArray = (SAMPLE *) malloc(numberOfBytes);
+    data.audioArray = (SAMPLE *) malloc(numOfBytes);
     if(data.audioArray == NULL)
     {
         printf("\naudioArray could not be initialized");
@@ -84,18 +84,18 @@ int main()
         printf("Could not record to 'audioArrayInit.raw'");
     else
     {
-        fwrite(data.audioArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+        fwrite(data.audioArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw empty audio data to '_audioArrayInit.raw'\n");
     }
-    file = fopen("_freqArrayInit.csv","wb");
+    file = fopen("_frequencyArrayInit.csv","wb");
     if(file == NULL)
-        printf("Could not record to 'freqArrayInit.csv'");
+        printf("Could not record to 'frequencyArrayInit.csv'");
     else
     {
-        fwrite(data.freqArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+        fwrite(data.frequencyArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
-		printf("Wrote raw empty audio data to 'freqArrayInit.csv'\n");
+		printf("Wrote raw empty audio data to 'frequencyArrayInit.csv'\n");
     }
     err = Pa_OpenStream(&stream, &inputParameters, NULL, SAMPLE_RATE,
                         FRAMES_PER_BUFFER, paClipOff, paTestCallBack,
@@ -123,17 +123,17 @@ int main()
 		fclose(file);
 		printf("Wrote raw audio data to 'audioArray.raw'\n");
 
-    file = fopen("freqArray.csv","wb");
+    file = fopen("frequencyArray.csv","wb");
     if(file == NULL)
         printf("Could not open file\n");
 	else 
     {
-	    fwrite(data.freqArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+	    fwrite(data.frequencyArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
-		printf("Wrote raw audio data to 'freqArray.csv'\n");
+		printf("Wrote raw audio data to 'frequencyArray.csv'\n");
 
     free(data.audioArray);
-    free(data.freqArray);
+    free(data.frequencyArray);
     Pa_Terminate();
     if(err != paNoError)
         goto error;
@@ -171,7 +171,7 @@ paTestCallBack(const void *inputBuffer, void *outputBuffer,
     paTestFreq *data = (paTestFreq*) userData;
     const SAMPLE *readPointer = (const SAMPLE*) inputBuffer;
     SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * CHANNEL_COUNT]; 
-    SAMPLE *writePointerFreqArray = &data->frequencyArray[data -> frameIndex * CHANNEL_COUNT]; 
+    SAMPLE *writePointerfrequencyArray = &data->frequencyArray[data -> frameIndex * CHANNEL_COUNT]; 
 
     long i, j, framesToCalculate;
 	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex)
@@ -194,7 +194,7 @@ paTestCallBack(const void *inputBuffer, void *outputBuffer,
             for(j = 0;j<NUM_OF_CHANNELS; j++)
             {
                 *writePointerAudioArray++ = SAMPLE_SILENCE;
-                *writePointerFreqArray++ = SAMPLE_SILENCE;
+                *writePointerfrequencyArray++ = SAMPLE_SILENCE;
             }
         }
     }
@@ -223,7 +223,7 @@ paTestCallBack(const void *inputBuffer, void *outputBuffer,
             }
             readPointerHolder = readPointer++;
             *writePointerAudioArray++ = *readPointerHolder; // Audio feedthrough
-            *writePointerFreqArray++ = *readPointerHolder; //IDK how to do the frequency write back. is it currFreq???
+            *writePointerfrequencyArray++ = *readPointerHolder; //IDK how to do the frequency write back. is it currFreq???
         }
     }
     data -> frameIndex = (data -> frameIndex) + framesToCalculate;
