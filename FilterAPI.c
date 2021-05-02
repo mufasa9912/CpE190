@@ -172,7 +172,7 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
     const SAMPLE *readPointer = (const SAMPLE*) inputBuffer;
     SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * NUM_OF_CHANNELS]; 
     SAMPLE *writePointerfrequencyArray = &data->frequencyArray[data -> frameIndex * NUM_OF_CHANNELS]; 
-    SAMPLE readPointerHolder;
+    SAMPLE *readPointerHolder;
     long i, j, framesToCalculate;
 	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex);
 
