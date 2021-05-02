@@ -4,21 +4,29 @@
 #include <string.h>
 #include "portaudio.h"
 #include "pa_linux_alsa.h"
-#include "ANC.h"
-#define FRAMES_PER_BUFFER (512)//was 512
+#include "ANC_Inversion.h"
+#define FRAMES_PER_BUFFER (512)
 #define CHANNEL_COUNT (2)
+#define SAMPLE_RATE (44100)
+#define delayUs 22.6757
 static paTestData data;
 static PaDeviceInfo device;
+
+char chrInput;
+double doubleInput = 0.0, ampChange = 1.0;
+int totalSamples;
+//constant float delayUs = 22.6757; //(1/44100)
+
 int main(){
-	printf("ANC PROGRAM STARTING\n");
+	printf("ANC PROGRAM STARTING\n\n");
 	
-	paTestData data;
+	//paTestData data;
 	PaStreamParameters inputParameters, outputParameters;
 	PaStream *stream;
 	PaError err;
-	int i, totalFrames, totalSamples, numberOfBytes;
+	int i, j, totalFrames, numberOfBytes;
 	FILE *file;
-	
+	SAMPLE avg, max, currentAmp;
 	err = Pa_Initialize();
 	if(err != paNoError) goto error;
 	
@@ -38,18 +46,66 @@ int main(){
 	inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)->defaultLowInputLatency;
 	outputParameters.suggestedLatency = Pa_GetDeviceInfo(outputParameters.device)->defaultLowOutputLatency;
 	
+  //Get user input
+  printf("\nEnter 'n' for no extra test, 0 to test range of amplitudes, or 1 for a specific change of amplitude.\n");
+  scanf("%c", &chrInput);
+  if(chrInput == 'n'){
+    printf("No extra tests selected.\n");
+  }
+  else if(chrInput == '0'){
+    printf("Range of amplitudes selected.\n");
+  }
+  else if(chrInput == '1'){
+    printf("Enter value for percent amplitude change. Ex: 1 -> 1%% increase\n");
+    scanf("%lf", &doubleInput);
+    ampChange = ampChange + doubleInput/100.0;
+    //printf("ampChange = %lf\n",ampChange);
+  }
+  else{
+    printf("ERROR. Invalid input.\n");
+    return -1;
+  }
+  printf("ampChange = %lf\n",ampChange);
+  
 	//Initialize data
 	data.frameIndex = 0;
-	data.maxFrameIndex = 44100 * 5; //5 for seconds to record
+	data.maxFrameIndex = SAMPLE_RATE * 5; //5 for seconds to record
 	totalFrames = data.maxFrameIndex;
 	totalSamples = totalFrames*CHANNEL_COUNT;
 	numberOfBytes = sizeof(SAMPLE) * totalSamples;
+ 
 	data.recordArray = (SAMPLE *) malloc( numberOfBytes );
 	if(data.recordArray == NULL){ printf("\nrecordArray could not be initialized\n"); free(data.recordArray); return -1;}
 	memset(data.recordArray, 0.0f, totalSamples);
   data.recordArrayInverse = (SAMPLE *) malloc( numberOfBytes );
 	if(data.recordArrayInverse == NULL){ printf("\nrecordArrayInverse could not be initialized\n"); free(data.recordArrayInverse); return -1;}
 	memset(data.recordArrayInverse, 0.0f, totalSamples);
+ 
+  if(chrInput == '0'){
+  data.recordArrayInverseAmp1 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmp1 == NULL){ printf("\nrecordArrayInverseAmp1 could not be initialized\n"); free(data.recordArrayInverseAmp1); return -1;}
+	memset(data.recordArrayInverseAmp1, 0.0f, totalSamples);
+ 
+  data.recordArrayInverseAmp2 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmp2 == NULL){ printf("\nrecordArrayInverseAmp2 could not be initialized\n"); free(data.recordArrayInverseAmp2); return -1;}
+	memset(data.recordArrayInverseAmp2, 0.0f, totalSamples);
+ 
+  data.recordArrayInverseAmp3 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmp3 == NULL){ printf("\nrecordArrayInverseAmp3 could not be initialized\n"); free(data.recordArrayInverseAmp3); return -1;}
+	memset(data.recordArrayInverseAmp3, 0.0f, totalSamples);
+ 
+  data.recordArrayInverseAmpNeg1 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmpNeg1 == NULL){ printf("\nrecordArrayInverseAmpNeg1 could not be initialized\n"); free(data.recordArrayInverseAmpNeg1); return -1;}
+	memset(data.recordArrayInverseAmpNeg1, 0.0f, totalSamples);
+ 
+  data.recordArrayInverseAmpNeg2 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmpNeg2 == NULL){ printf("\nrecordArrayInverseAmpNeg2 could not be initialized\n"); free(data.recordArrayInverseAmpNeg2); return -1;}
+	memset(data.recordArrayInverseAmpNeg2, 0.0f, totalSamples);
+ 
+  data.recordArrayInverseAmpNeg3 = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayInverseAmpNeg3 == NULL){ printf("\nrecordArrayInverseAmpNeg3 could not be initialized\n"); free(data.recordArrayInverseAmpNeg3);  return -1;}
+	memset(data.recordArrayInverseAmpNeg3, 0.0f, totalSamples);
+  }
 
   //INIT FILE
 	file = fopen("_recordArrayInit.raw","wb");
@@ -74,8 +130,7 @@ int main(){
     err = Pa_OpenStream( &stream,
                                 &inputParameters,          
                                 NULL,//&outputParameters,        
-                                //paFloat32,  /* 32 bit floating point output */
-                                44100,/* SAMPLE_RATE */
+                                SAMPLE_RATE,/* SAMPLE_RATE */
                                 FRAMES_PER_BUFFER, /*FRAMES_PER_BUFFER, /* frames per buffer, i.e. the number
                                                    of sample frames that PortAudio will
                                                    request from the callback. Many apps
@@ -93,17 +148,15 @@ int main(){
 	err = Pa_StartStream(stream); //calls the callback function until strem
 	if(err != paNoError) goto error;
 	
-	//PROGRAM END//
-	//Pa_Sleep(5*1000); //5 second sleep
-	//printf("Enter any key to end the progam\n");
-	//getchar();
-	while(Pa_IsStreamActive(stream));
+  while(Pa_IsStreamActive(stream));
 	
 	err = Pa_StopStream(stream); //Pa_AbortStream() is an option too
 	if(err != paNoError) goto error;
 	err = Pa_CloseStream(stream);
 	if(err != paNoError) goto error;
 	
+ printf("\n");
+ 
   //WRITE TO FILE
 	file = fopen("recordArray.raw","wb");
 	if(file == NULL){ printf("Could not open file\n");}
@@ -136,11 +189,51 @@ int main(){
  for(i = 0; i < value;i++){
      printf(PRINT_S_FORMAT, data.recordArray[i] + data.recordArrayInverse[i]);
  }
- printf("\n");
  
+ printf("\n\nA delay of one sample leads to a 22.6757 microsecond delay.\n");
+ for(i = 0; i < totalSamples; i++){
+       currentAmp = data.recordArray[i];
+       if(currentAmp < 0){currentAmp = currentAmp * -1.0;}
+       if(currentAmp > max){max = currentAmp;}
+       avg = avg + currentAmp;
+   }
+   avg = avg/totalSamples;
+   printf("Analysis of the raw input:\n");
+   printf("Avg Amplitude: %.10f, Max Amplitude: %.10f\n\n", avg, max);
+   
+ if(chrInput == 'n' || chrInput == '1'){
+     printf("======================================================================\n");
+     audioAnalysis(0, ampChange); //recordArrayInverse
+     printf("======================================================================\n");
+ }
+ else if(chrInput == '0'){
+     printf("======================================================================\n");
+     audioAnalysis(0, 1); //recordArrayInverse
+     printf("======================================================================\n");
+     audioAnalysis(1,-1); //recordArrayInverseAmp1
+     printf("======================================================================\n");
+     audioAnalysis(2,-1); //recordArrayInverseAmp2
+     printf("======================================================================\n");
+     audioAnalysis(3,-1); //recordArrayInverseAmp3
+     printf("======================================================================\n");
+     audioAnalysis(4,-1); //recordArrayInverseAmpNeg1
+     printf("======================================================================\n");
+     audioAnalysis(5,-1); //recordArrayInverseAmpNeg2
+     printf("======================================================================\n");
+     audioAnalysis(6,-1); //recordArrayInverseAmpNeg3
+     printf("======================================================================\n");
+ }
  
 	free(data.recordArray);
   free(data.recordArrayInverse);
+  if(chrInput == '0'){
+    free(data.recordArrayInverseAmp1);
+    free(data.recordArrayInverseAmp2);
+    free(data.recordArrayInverseAmp3);
+    free(data.recordArrayInverseAmpNeg1);
+    free(data.recordArrayInverseAmpNeg2);
+    free(data.recordArrayInverseAmpNeg3);
+  }
 	err = Pa_Terminate();
 	if(err != paNoError) goto error;
 	
@@ -151,6 +244,14 @@ error: //DEFAULT ERROR DISPLAY CODE
 	if(stream){ Pa_AbortStream(stream); Pa_CloseStream(stream);}
 	free(data.recordArray);
   free(data.recordArrayInverse);
+  if(chrInput == '0'){
+    free(data.recordArrayInverseAmp1);
+    free(data.recordArrayInverseAmp2);
+    free(data.recordArrayInverseAmp3);
+    free(data.recordArrayInverseAmpNeg1);
+    free(data.recordArrayInverseAmpNeg2);
+    free(data.recordArrayInverseAmpNeg3);
+  }
 	Pa_Terminate();
     fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
@@ -201,20 +302,84 @@ static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
 		}
 	}
 	else{
+   if(chrInput == 'n' || chrInput == '1'){
+   for(i = 0; i < framesToCalculate; i++){
+        readPointerHolder = readPointer++;//LEFT C
+				*writePointerRecordArray++  = *readPointerHolder;        //was *readPointer++; Problem- the ++ increments
+        *writePointerInverseArray++ = (-1.0)*(*readPointerHolder)*ampChange;   // * percentIncrease
+				if(CHANNEL_COUNT==2){
+          readPointerHolder = readPointer++;//RIGHT C
+          *writePointerRecordArray++  = *readPointerHolder;  
+          *writePointerInverseArray++ = (-1.0)*(*readPointerHolder)*ampChange;  // * percentIncrease
+          }
+		}
+   }
+   else if(chrInput == '0'){
+   SAMPLE *writePointerInverseArrayAmp1    = &data->recordArrayInverseAmp1[data -> frameIndex * CHANNEL_COUNT]; 
+   SAMPLE *writePointerInverseArrayAmp2    = &data->recordArrayInverseAmp2[data -> frameIndex * CHANNEL_COUNT]; 
+   SAMPLE *writePointerInverseArrayAmp3    = &data->recordArrayInverseAmp3[data -> frameIndex * CHANNEL_COUNT]; 
+   SAMPLE *writePointerInverseArrayNegAmp1 = &data->recordArrayInverseAmpNeg1[data -> frameIndex * CHANNEL_COUNT]; 
+   SAMPLE *writePointerInverseArrayNegAmp2 = &data->recordArrayInverseAmpNeg2[data -> frameIndex * CHANNEL_COUNT]; 
+   SAMPLE *writePointerInverseArrayNegAmp3 = &data->recordArrayInverseAmpNeg3[data -> frameIndex * CHANNEL_COUNT]; 
    for(i = 0; i < framesToCalculate; i++){
         readPointerHolder = readPointer++;
 				*writePointerRecordArray++  = *readPointerHolder;        //was *readPointer++; Problem- the ++ increments
-        *writePointerInverseArray++ = (-1.0)*(*readPointerHolder);   
+        *writePointerInverseArray++ = (-1.0)*(*readPointerHolder);
+        *writePointerInverseArrayAmp1++ = (-1.0)*(*readPointerHolder)*(1.01);
+        *writePointerInverseArrayAmp2++ = (-1.0)*(*readPointerHolder)*(1.02);
+        *writePointerInverseArrayAmp3++ = (-1.0)*(*readPointerHolder)*(1.03);
+        *writePointerInverseArrayNegAmp1++ = (-1.0)*(*readPointerHolder)*(.99);
+        *writePointerInverseArrayNegAmp2++ = (-1.0)*(*readPointerHolder)*(.98);
+        *writePointerInverseArrayNegAmp3++ = (-1.0)*(*readPointerHolder)*(.97);
 				if(CHANNEL_COUNT==2){
           readPointerHolder = readPointer++;
           *writePointerRecordArray++  = *readPointerHolder;  
           *writePointerInverseArray++ = (-1.0)*(*readPointerHolder);
+          *writePointerInverseArrayAmp1++ = (-1.0)*(*readPointerHolder)*(1.01);
+          *writePointerInverseArrayAmp2++ = (-1.0)*(*readPointerHolder)*(1.02);
+          *writePointerInverseArrayAmp3++ = (-1.0)*(*readPointerHolder)*(1.03);
+          *writePointerInverseArrayNegAmp1++ = (-1.0)*(*readPointerHolder)*(.99);
+          *writePointerInverseArrayNegAmp2++ = (-1.0)*(*readPointerHolder)*(.98);
+          *writePointerInverseArrayNegAmp3++ = (-1.0)*(*readPointerHolder)*(.97);
           }
 		}
+   }
 	}
    	data->frameIndex = (data->frameIndex) + framesToCalculate;
     return done;
 }
 
+void audioAnalysis(int num, double ampChange){
+
+if(num == 0){printf("Analysis with an amplitude change of %.2lf%%\n\n", 100*(ampChange-1.0));}
+else if(num == 1){printf("Analysis with an amplitude change of +1%%\n\n");}
+else if(num == 2){printf("Analysis with an amplitude change of +2%%\n\n");}
+else if(num == 3){printf("Analysis with an amplitude change of +3%%\n\n");}
+else if(num == 4){printf("Analysis with an amplitude change of -1%%\n\n");}
+else if(num == 5){printf("Analysis with an amplitude change of -2%%\n\n");}
+else if(num == 6){printf("Analysis with an amplitude change of -3%%\n\n");}
+else{printf("ERROR 0 IN AUDIO ANALYSIS");}
 
 
+int i, j;
+ for(i = 0; i < 16; i++){
+   SAMPLE max = 0, avg = 0, currentAmp = 0;
+   if(i == 1) printf("Analysis with an output delay of %d sample  (%3.4f microseconds):\n", i, delayUs*i);
+   else  printf("Analysis with an output delay of %d samples (%3.4f microseconds):\n", i, delayUs*i);
+   for(j = 0; j < totalSamples; j++){ //j-i might be wrong
+       if(num == 0){currentAmp = data.recordArray[j] + data.recordArrayInverse[j-i];}
+       else if(num == 1){currentAmp = data.recordArray[j] + data.recordArrayInverseAmp1[j-i];}
+       else if(num == 2){currentAmp = data.recordArray[j] + data.recordArrayInverseAmp2[j-i];}
+       else if(num == 3){currentAmp = data.recordArray[j] + data.recordArrayInverseAmp3[j-i];}
+       else if(num == 4){currentAmp = data.recordArray[j] + data.recordArrayInverseAmpNeg1[j-i];}
+       else if(num == 5){currentAmp = data.recordArray[j] + data.recordArrayInverseAmpNeg2[j-i];}
+       else if(num == 6){currentAmp = data.recordArray[j] + data.recordArrayInverseAmpNeg3[j-i];}
+       else{printf("ERROR 1 IN AUDIO ANALYSIS");}
+       if(currentAmp < 0){currentAmp = currentAmp * -1.0;}
+       if(currentAmp > max){max = currentAmp;}
+       avg = avg + currentAmp;
+   }
+   avg = avg/totalSamples;
+   printf("Avg Amplitude: %.10f, Max Amplitude: %.10f\n\n", avg, max);
+ }
+}
