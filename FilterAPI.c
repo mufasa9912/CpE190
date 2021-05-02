@@ -213,18 +213,18 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
                 readPointerHolder = readPointer++;
                 if(i == 0) //Initailize the freq indexes
                 {    
-                    data->freqVal1 = readPointerHolder;
+                    data->freqVal1 = *readPointerHolder;
                     data->freqIndex1 = 0;
                 }
                 else if(data->freqVal1 > 0 && readPointerHolder < 0) //from pos to neg ISSUE
                 {
-                    data->freqVal2 = readPointerHolder;
+                    data->freqVal2 = *readPointerHolder;
                     data->freqIndex2 = i;
                     data->currFreq = 2*(data->freqIndex2 - data->freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
                 }
                 else if(data->freqVal2 < 0 && readPointerHolder>0) //from neg to pos ISSUE
                 {
-                    data->freqVal1 = readPointerHolder; //POSSIBLE ISSUE
+                    data->freqVal1 = *readPointerHolder; //POSSIBLE ISSUE
                     data->freqIndex1 = i;
                     data->currFreq = 2*(data->freqIndex1 - data->freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
                 }
