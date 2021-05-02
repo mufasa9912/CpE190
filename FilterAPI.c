@@ -119,7 +119,7 @@ int main()
         printf("Could not open file\n");
 	else 
     {
-	    fwrite(data.audioArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+	    fwrite(data.audioArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw audio data to 'audioArray.raw'\n");
 
@@ -156,7 +156,7 @@ int main()
         return -1;
 }
 
-paTestCallBack(const void *inputBuffer, void *outputBuffer,
+static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
                unsigned long framesPerBuffer,
                const PaStreamCallbackTimeInfo* timeInfo,
                PaStreamCallbackFlags statusFlags,
