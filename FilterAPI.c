@@ -128,7 +128,7 @@ int main()
         printf("Could not open file\n");
 	else 
     {
-	    fwrite(data.frequencyArray, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+	    fwrite(data.frequencyArray, NUM_OF_CHANNELS * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
 		printf("Wrote raw audio data to 'frequencyArray.csv'\n");
 
@@ -205,20 +205,20 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
         {
             if(i == 0) //Initailize the freq indexes
             {    
-                data.freqVal1 = audioArray[0];
-                data.freqIndex1 = 0;
+                data->freqVal1 = audioArray[0];
+                data->freqIndex1 = 0;
             }
-            else if(data.freqVal1 > 0 && audioArray[i] < 0) //from pos to neg
+            else if(data->freqVal1 > 0 && audioArray[i] < 0) //from pos to neg ISSUE
             {
-                data.freqVal2 = audioArray[i];
-                data.freqIndex2 = i;
-                data.currFreq = 2*(data.freqIndex2 - data.freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+                data->freqVal2 = audioArray[i];
+                data->freqIndex2 = i;
+                data->currFreq = 2*(data->freqIndex2 - data->freqIndex1) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
             }
-            else if(data.freqVal2 < 0 && audioArray[i]>0) //from neg to pos
+            else if(data->freqVal2 < 0 && audioArray[i]>0) //from neg to pos ISSUE
             {
-                data.freqVal1 = audioArray[i];
-                data.freqIndex1 = i;
-                data.currFreq = 2*(data.freqIndex1 - data.freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
+                data->freqVal1 = audioArray[i]; //POSSIBLE ISSUE
+                data->freqIndex1 = i;
+                data->currFreq = 2*(data->freqIndex1 - data->freqIndex2) * (1/SAMPLE_RATE); //TIME BETWEEN SAMPLES ZEROS APPROX
             }
             readPointerHolder = readPointer++;
             *writePointerAudioArray++ = *readPointerHolder; // Audio feedthrough
