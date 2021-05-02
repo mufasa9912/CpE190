@@ -160,7 +160,8 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
                unsigned long framesPerBuffer,
                const PaStreamCallbackTimeInfo* timeInfo,
                PaStreamCallbackFlags statusFlags,
-               void *userData){
+               void *userData)
+{
     (void) outputBuffer;
     (void) timeInfo;
     (void) statusFlags;
@@ -169,11 +170,11 @@ static int paTestCallBack(const void *inputBuffer, void *outputBuffer,
     int done = paContinue;
     paTestFreq *data = (paTestFreq*) userData;
     const SAMPLE *readPointer = (const SAMPLE*) inputBuffer;
-    SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * CHANNEL_COUNT]; 
-    SAMPLE *writePointerfrequencyArray = &data->frequencyArray[data -> frameIndex * CHANNEL_COUNT]; 
+    SAMPLE *writePointerAudioArray = &data->audioArray[data -> frameIndex * NUM_OF_CHANNELS]; 
+    SAMPLE *writePointerfrequencyArray = &data->frequencyArray[data -> frameIndex * NUM_OF_CHANNELS]; 
 
     long i, j, framesToCalculate;
-	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex)
+	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex);
 
     if(remainingFrames < framesPerBuffer)
     {
