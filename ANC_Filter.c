@@ -130,7 +130,6 @@ int main(){
   file = fopen("FreqOutput.csv","wb");
   if(file == NULL){ printf("Could not open file\n");}
   else{
-    fprintf(file,"Index, Frequency\n");
     for(ohboy = 0; ohboy < totalFrames/FRAMES_PER_BUFFER; ohboy++){
       fprintf(file,"%d, %lf\n", ohboy, data.freqArray[ohboy]);
     }
@@ -140,7 +139,6 @@ int main(){
   file = fopen("Amplitudes.csv","wb");
   if(file == NULL){ printf("Could not open file\n");}
   else{
-    fprintf(file,"Index, InputAmp, FilteredAmp\n");
     for(ohboy = 0; ohboy < totalSamples/2; ohboy++){
       fprintf(file,"%d, %lf, %lf\n", ohboy, data.recordArray[2*ohboy], data.recordArrayFilterOutput[2*ohboy]);
     }
