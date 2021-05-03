@@ -4,8 +4,8 @@
 #include <string.h>
 #include "portaudio.h"
 #include "pa_linux_alsa.h"
-#include "ANC_Phase.h"
-#define FRAMES_PER_BUFFER (8192)//was 512
+#include "ANC_Filter.h"
+#define FRAMES_PER_BUFFER (4096)//was 512
 #define CHANNEL_COUNT (2)
 static paTestData data;
 static PaDeviceInfo device;
@@ -41,8 +41,9 @@ int main(){
 	
 	//Initialize data
   data.outputSilenceFlag = 0;
-  data.periodEstimate = -1;
+  data.freqEstimate = -1;
 	data.frameIndex = 0;
+  data.freqIndex = 0;
 	data.maxFrameIndex = 44100 * 5; //5 for seconds to record
 	totalFrames = data.maxFrameIndex;
 	totalSamples = totalFrames*CHANNEL_COUNT;
@@ -50,9 +51,12 @@ int main(){
 	data.recordArray = (SAMPLE *) malloc( numberOfBytes );
 	if(data.recordArray == NULL){ printf("\nrecordArray could not be initialized\n"); free(data.recordArray); return -1;}
 	memset(data.recordArray, 0.0f, totalSamples);
-  data.recordArrayPhase = (SAMPLE *) malloc( numberOfBytes );
-	if(data.recordArrayPhase == NULL){ printf("\nrecordArrayPhase could not be initialized\n"); free(data.recordArrayPhase); return -1;}
-	memset(data.recordArrayPhase, 0.0f, totalSamples);
+  data.recordArrayFilterOutput = (SAMPLE *) malloc( numberOfBytes );
+	if(data.recordArrayFilterOutput == NULL){ printf("\nrecordArrayFilterOutput could not be initialized\n"); free(data.recordArrayFilterOutput); return -1;}
+	memset(data.recordArrayFilterOutput, 0.0f, totalSamples);
+  data.freqArray = (SAMPLE *) malloc( numberOfBytes/FRAMES_PER_BUFFER );//probably
+	if(data.freqArray == NULL){ printf("\nfreqArray could not be initialized\n"); free(data.freqArray); return -1;}
+	memset(data.freqArray, 0.0f, totalSamples/(2*FRAMES_PER_BUFFER));
   
   //INIT FILE
 	file = fopen("_recordArrayInit.raw","wb");
@@ -63,12 +67,12 @@ int main(){
 		printf("\nWrote raw empty audio data to '_recordArrayInit.raw'\n");
 			
 	}
- 	file = fopen("_recordArrayPhaseInit.raw","wb");
-	if(file == NULL){ printf("Could not open file '_recordArrayPhaseInit.raw'\n");}
+ 	file = fopen("_recordArrayFilterOutputInit.raw","wb");
+	if(file == NULL){ printf("Could not open file '_recordArrayFilterOutputInit.raw'\n");}
 	else {
-		fwrite(data.recordArrayPhase, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+		fwrite(data.recordArrayFilterOutput, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
-		printf("Wrote raw empty audio data to '_recordArrayPhaseInit.raw'\n");
+		printf("Wrote raw empty audio data to '_recordArrayFilterOutputInit.raw'\n");
 			
 	}
  
@@ -97,7 +101,7 @@ int main(){
 	if(err != paNoError) goto error;
 
   while(Pa_IsStreamActive(stream)){
-    //printf("%.2f Hz\n", data.periodEstimate);
+    //printf("%.2f Hz\n", data.freqEstimate);
   }
 
  	//PROGRAM END//
@@ -115,36 +119,52 @@ int main(){
 		printf("Wrote raw audio data to 'recordArray.raw'\n");
 			
 	}
- 	file = fopen("recordArrayPhase.raw","wb");
+ 	file = fopen("recordArrayFilterOutput.raw","wb");
 	if(file == NULL){ printf("Could not open file\n");}
 	else {
-	  fwrite(data.recordArrayPhase, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
+	  fwrite(data.recordArrayFilterOutput, CHANNEL_COUNT * sizeof(SAMPLE),totalFrames, file);
 		fclose(file);
-		printf("Wrote raw audio data to 'recordArrayPhase.raw'\n");
-			
+		printf("Wrote filtered audio data to 'recordArrayFilterOutput.raw'\n");
 	}
+  int ohboy;
+  file = fopen("FreqOutput.csv","wb");
+  if(file == NULL){ printf("Could not open file\n");}
+  else{
+    fprintf(file,"Index, Frequency\n");
+    for(ohboy = 0; ohboy < totalFrames/FRAMES_PER_BUFFER; ohboy++){
+      fprintf(file,"%d, %lf\n", ohboy, data.freqArray[ohboy]);
+    }
+    fclose(file);
+    printf("Wrote frequency data to 'FreqOutput.csv'\n");
+  }
+  file = fopen("Amplitudes.csv","wb");
+  if(file == NULL){ printf("Could not open file\n");}
+  else{
+    fprintf(file,"Index, InputAmp, FilteredAmp\n");
+    for(ohboy = 0; ohboy < totalSamples/2; ohboy++){
+      fprintf(file,"%d, %lf, %lf\n", ohboy, data.recordArray[2*ohboy], data.recordArrayFilterOutput[2*ohboy]);
+    }
+    fclose(file);
+    printf("Wrote amplitude data to 'Amplitudes.csv'\n");
+  }
  
  //ARRAY DATA DISPLAY
- printf("%.20f ", data.periodEstimate);
+ printf("%.20f ", data.freqEstimate);
  printf("RAW DATA SAMPLE:\n");
  int value = 60;
 	for(i = 0; i < value;i++){
     printf(PRINT_S_FORMAT, data.recordArray[i]);
  }
+printf("\n");
+ printf("FREQUENCY ARRAY DATA SAMPLE:\n");
+ value = 20;
+	for(i = 0; i < value;i++){
+    printf(PRINT_S_FORMAT, data.freqArray[i]);
+ }
 
- //printf("\nMODIFIED DATA SAMPLE:\n");
- //for(i = 0; i < value;i++){
- //    printf(PRINT_S_FORMAT, data.recordArrayPhase[i]);
- //}
- //printf("\nCOMBINED DATA SAMPLES:\n");
- //for(i = 0; i < value;i++){
- //    printf(PRINT_S_FORMAT, data.recordArray[i] + data.recordArrayPhase[i]);
- //}
- //printf("\n");
- 
- 
 	free(data.recordArray);
-  free(data.recordArrayPhase);
+  free(data.recordArrayFilterOutput);
+  free(data.freqArray);
 	err = Pa_Terminate();
 	if(err != paNoError) goto error;
 	
@@ -154,7 +174,8 @@ int main(){
 error: //DEFAULT ERROR DISPLAY CODE
 	if(stream){ Pa_AbortStream(stream); Pa_CloseStream(stream);}
 	free(data.recordArray);
-  free(data.recordArrayPhase);
+  free(data.recordArrayFilterOutput);
+  free(data.freqArray);
 	Pa_Terminate();
     fprintf( stderr, "An error occurred while using the portaudio stream\n" );
     fprintf( stderr, "Error number: %d\n", err );
@@ -181,8 +202,9 @@ static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
 	paTestData *data = (paTestData*)userData;
   //SAMPLE *out = (SAMPLE*)outputBuffer; NOT NEEDED JUST YET
   const SAMPLE *readPointer = (const SAMPLE*)inputBuffer; //const
-	SAMPLE *writePointerRecordArray = &data->recordArray[data -> frameIndex * CHANNEL_COUNT]; 
-  SAMPLE *writePointerPhaseArray = &data->recordArrayPhase[data -> frameIndex * CHANNEL_COUNT]; 
+	SAMPLE *writePointerRecordArray    = &data->recordArray[data -> frameIndex * CHANNEL_COUNT]; 
+  SAMPLE *writePointerFilterOutArray = &data->recordArrayFilterOutput[data -> frameIndex * CHANNEL_COUNT]; 
+  SAMPLE *writePointerFreqArray      = &data->freqArray[data -> freqIndex]; 
   SAMPLE *readPointerHolder;
 	long i, framesToCalculate;
 	unsigned long remainingFrames = (data -> maxFrameIndex) - (data -> frameIndex);
@@ -204,26 +226,26 @@ static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
 	if( inputBuffer == NULL){
 		for(i = 0; i < framesToCalculate; i++){
 				*writePointerRecordArray++ = SAMPLE_SILENCE;
-        *writePointerPhaseArray++ = SAMPLE_SILENCE;
+        *writePointerFilterOutArray++ = SAMPLE_SILENCE;
 				if(CHANNEL_COUNT==2){
             *writePointerRecordArray++ = SAMPLE_SILENCE; 
-            *writePointerPhaseArray++ = SAMPLE_SILENCE;
+            *writePointerFilterOutArray++ = SAMPLE_SILENCE;
             }
 		}
-     data -> periodEstimate = 0;
+     data -> freqEstimate = 0;
 	}
 	else{
    for(i = 0; i < framesToCalculate; i++){
         readPointerHolder = readPointer++;
-				*writePointerRecordArray++  = *readPointerHolder;        //was *readPointer++; Problem- the ++ increments
-        if(data -> outputSilenceFlag == 1){*writePointerPhaseArray++ = SAMPLE_SILENCE;}
-        else {                             *writePointerPhaseArray++ = *readPointerHolder;}
+				*writePointerRecordArray++  = *readPointerHolder;//was *readPointer++; Problem- the ++ increments
+        if(data -> outputSilenceFlag == 1){*writePointerFilterOutArray++ = SAMPLE_SILENCE;}
+        else {                             *writePointerFilterOutArray++ = *readPointerHolder;}
        
 				if(CHANNEL_COUNT==2){
           readPointerHolder = readPointer++;
           *writePointerRecordArray++ = *readPointerHolder;  
-          if(data -> outputSilenceFlag == 1){*writePointerPhaseArray++ = SAMPLE_SILENCE;}
-          else{                              *writePointerPhaseArray++ = *readPointerHolder;}
+          if(data -> outputSilenceFlag == 1){*writePointerFilterOutArray++ = SAMPLE_SILENCE;}
+          else{                              *writePointerFilterOutArray++ = *readPointerHolder;}
           }
           
            currentAmp  = data->recordArray[data->frameIndex*CHANNEL_COUNT+CHANNEL_COUNT*i];
@@ -237,13 +259,17 @@ static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
 		}
     if( data -> outputSilenceFlag == 1){data -> outputSilenceFlag = 0;}
     if(peakCount > 0){
-     data -> periodEstimate = 1/(FRAMES_PER_BUFFER*((1.0/44100.0)/(peakCount)));//peakCount
-     if(data -> periodEstimate < 150 || data -> periodEstimate > 1250){
-     printf("I AM HERE\n");
+     data -> freqEstimate = 1/(FRAMES_PER_BUFFER*((1.0/44100.0)/(peakCount)));
+     *writePointerFreqArray = data -> freqEstimate;
+     if(data -> freqEstimate < 150 || data -> freqEstimate > 1250){
        data -> outputSilenceFlag = 1;
      }
     }
+    else{
+    *writePointerFreqArray = -1;
+    }
 	}
 	data->frameIndex = data->frameIndex + framesToCalculate;
+  data -> freqIndex++;
     return done;
 }

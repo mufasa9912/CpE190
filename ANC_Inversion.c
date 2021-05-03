@@ -383,3 +383,6 @@ int i, j;
    printf("Avg Amplitude: %.10f, Max Amplitude: %.10f\n\n", avg, max);
  }
 }
+
+
+
