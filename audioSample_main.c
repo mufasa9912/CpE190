@@ -111,8 +111,6 @@ extern void Audio_echo_Task(void);
  */
 int main(Void)
 {
-
-
     /* enable the pinmux & PSC-enable for the mcasp device    */
     configureAudio();
 
@@ -124,9 +122,10 @@ int main(Void)
       this is being called AFTER McaspDevice_init() which initializes with the
       default parameters */
     configMcASP_SocHwInfo();
-#if defined(AIC_CODEC)
-    Aic31_init();
-#endif
+    #if defined(AIC_CODEC)
+        Aic31_init();
+    #endif
+    
     Log_info0("\r\nAudio Sample Main\n");
     printf("ANC START\n");
 
