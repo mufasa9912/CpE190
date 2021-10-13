@@ -4,18 +4,14 @@ typedef float SAMPLE;
 #define PRINT_S_FORMAT "%.10f\t"
 
 typedef struct {
-		SAMPLE *recordArray;
+    SAMPLE *recordArray;
     SAMPLE *recordArrayFilterOutput;
     SAMPLE *freqArray;
     SAMPLE freqEstimate;
     int outputSilenceFlag;
-		int frameIndex;
-		int maxFrameIndex;
+    int frameIndex;
+    int maxFrameIndex;
     int freqIndex;
 } paTestData;
 
-static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
-                           unsigned long framesPerBuffer,
-                           const PaStreamCallbackTimeInfo* timeInfo,
-                           PaStreamCallbackFlags statusFlags,
-                           void *userData );
+static int paTestCallBack(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);

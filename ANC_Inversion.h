@@ -4,7 +4,7 @@ typedef float SAMPLE;
 #define PRINT_S_FORMAT "%.10f\t"
 
 typedef struct {
-		SAMPLE *recordArray;
+    SAMPLE *recordArray;
     SAMPLE *recordArrayInverse;
     SAMPLE *recordArrayInverseAmp1;
     SAMPLE *recordArrayInverseAmp2;
@@ -12,14 +12,10 @@ typedef struct {
     SAMPLE *recordArrayInverseAmpNeg1;
     SAMPLE *recordArrayInverseAmpNeg2;
     SAMPLE *recordArrayInverseAmpNeg3;
-		int frameIndex;
-		int maxFrameIndex;
+    int frameIndex;
+    int maxFrameIndex;
 } paTestData;
 
-static int paTestCallBack( const void *inputBuffer, void *outputBuffer,
-                           unsigned long framesPerBuffer,
-                           const PaStreamCallbackTimeInfo* timeInfo,
-                           PaStreamCallbackFlags statusFlags,
-                           void *userData );
+static int paTestCallBack(const void *inputBuffer, void *outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void *userData);
 
 void audioAnalysis(int num, double ampChange);
