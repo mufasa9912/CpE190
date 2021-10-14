@@ -188,7 +188,7 @@ static int32_t aic31MuteConfig(
                                 Bool           muteConfig
                             );
 
-static int32_t aic31SetSamplingRate(
+static int32_t aic31SetSamplingRate( 
                                         Aic31_Object *instHandle,
                                         ICodec_Channel acChannel,
                                         uint32_t        sampleRate
