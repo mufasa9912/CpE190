@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "mcasp_debug.h": "c",
+        "deviceloopback.h": "c"
+    }
+}

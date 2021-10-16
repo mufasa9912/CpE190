@@ -6,7 +6,7 @@
  *  This file contains the implementation of the AIC31 audio codec driver for
  *  DSP BIOS operating system.
  *
- *  (C) Copyright 2012, Texas Instruments, Inc
+ *  (C) Copyright 2012-2019, Texas Instruments, Inc
  */
 
 /*
@@ -49,7 +49,7 @@
 #include "aic31_if.h"
 #include <ICodec.h>
 #include <math.h>
-#include <stdio.h>
+
 /******************************************************************************
 **                      INTERNAL MACRO DEFINITIONS
 *******************************************************************************/
@@ -169,6 +169,7 @@
 
 #define AIC31_VOLUME_STEP_SIZE      (127)
 #define MAX_VOLUME_PERCENT          (100)
+
 /******************************************************************************
 **                          FUNCTION DEFINITIONS
 *******************************************************************************/
@@ -236,246 +237,120 @@ void AIC31DataConfig(unsigned int baseAddr, unsigned char dataType, unsigned cha
     /* valid data after dataOff number of clock cycles */
     CodecRegWrite(baseAddr, AIC31_P0_REG10, dataOff);
 
+    #if defined (MCASP_MASTER)
+        /* use PLL_CLK_IN as BCLK */
+        CodecRegWrite(baseAddr, AIC31_P0_REG102, 0xA2);
+    #endif
 
 }
 
-#ifdef MCASP_MASTER
-    /**
-     * \brief   Configures the data format and slot width
-     *
-     * \param   baseAddr     Base Address of the interface connected to AIC31
-     * \param   mode         section of the codec (ADC/DAC) for which the sample
-     *                       rate needs to be configured
-     * \param   sampleRate   Sample rate in samples per second
-     *              mode can take the values \n
-     *                AIC31_MODE_ADC - for selecting ADC \n
-     *                AIC31_MODE_DAC - for selecting DAC \n
-     *                AIC31_MODE_BOTH - for both ADC and DAC \n
-     *              sampleRate can be \n
-     *                 8000, 11025, 16000, 22050, 24000, 32000, 44100,
-     *                 48000 or  96000. \n
-     *          The fs is derived from the equation
-     *                fs = (PLL_IN * [pllJval.pllDval] * pllRval) /(2048 * pllPval).
-     *          So the values are set for PLL_IN = 24576 kHz
-     *
-     * \return  None.
-     *
-     **/
-    void AIC31SampleRateConfig(unsigned int baseAddr, unsigned int mode, unsigned int sampleRate)
+/**
+ * \brief   Configures the data format and slot width
+ *
+ * \param   baseAddr     Base Address of the interface connected to AIC31
+ * \param   mode         section of the codec (ADC/DAC) for which the sample
+ *                       rate needs to be configured
+ * \param   sampleRate   Sample rate in samples per second
+ *              mode can take the values \n
+ *                AIC31_MODE_ADC - for selecting ADC \n
+ *                AIC31_MODE_DAC - for selecting DAC \n
+ *                AIC31_MODE_BOTH - for both ADC and DAC \n
+ *              sampleRate can be \n
+ *                 8000, 11025, 16000, 22050, 24000, 32000, 44100,
+ *                 48000 or  96000. \n
+ *          The fs is derived from the equation
+ *                fs = (PLL_IN * [pllJval.pllDval] * pllRval) /(2048 * pllPval).
+ *          So the values are set for PLL_IN = 24576 kHz
+ *
+ * \return  None.
+ *
+ **/
+void AIC31SampleRateConfig(unsigned int baseAddr, unsigned int mode, unsigned int sampleRate)
+{
+    unsigned char fs;
+    unsigned char ref = 0x0Au;
+    unsigned char temp;
+    unsigned char pllPval = 2u;
+
+    /* Select the configuration for the given sampling rate */
+    switch(sampleRate)
     {
-        unsigned char fs;
-        unsigned char ref = 0x0Au;
-        unsigned char temp;
-        unsigned char pllPval = 4u;
-        unsigned char pllRval = 1u;
-        unsigned char pllJval = 16u;
-        unsigned short pllDval = 0u;
+        case 8000:
+            fs = 0xAAu;
+        break;
 
-        /* Select the configuration for the given sampling rate */
-        switch(sampleRate)
-        {
-            case 8000:
-                fs = 0xAAu;
-                break;
+        case 11025:
+            fs = 0x66u;
+            ref = 0x8Au;
+        break;
 
-            case 11025:
-                fs = 0x66u;
-                ref = 0x8Au;
-                pllJval = 14u;
-                pllDval = 7000u;
-                break;
+        case 16000:
+            fs = 0x44u;
+        break;
 
-            case 16000:
-                fs = 0x44u;
-                break;
+        case 22050:
+            fs = 0x22u;
+            ref = 0x8Au;
+        break;
 
-            case 22050:
-                fs = 0x22u;
-                ref = 0x8Au;
-                pllJval = 14u;
-                pllDval = 7000u;
-                break;
+        case 24000:
+            fs = 0x22u;
+        break;
 
-            case 24000:
-                fs = 0x22u;
-                break;
+        case 32000:
+            fs = 0x11u;
+        break;
 
-            case 32000:
-                fs = 0x11u;
-                break;
+        case 44100:
+            ref = 0x8Au;
+            fs = 0x00u;
+        break;
 
-            case 44100:
-                ref = 0x8Au;
-                fs = 0x00u;
-                pllJval = 14u;
-                pllDval = 7000u;
-                break;
+        case 48000:
+            fs = 0x00u;
+        break;
 
-            case 48000:
-                fs = 0x00u;
-                break;
+        case 96000:
+            ref = 0x6Au;
+            fs = 0x00u;
+        break;
 
-            case 96000:
-                ref = 0x6Au;
-                fs = 0x00u;
-                break;
-
-            default:
-                fs = 0x00u;
-                break;
-        }
-
-        temp = (mode & fs);
-
-        /* Set the sample Rate */
-        CodecRegWrite(baseAddr, AIC31_P0_REG2, temp);
-
-        CodecRegWrite(baseAddr, AIC31_P0_REG3, 0x80 | pllPval);
-
-        /* use PLL_CLK_IN as MCLK */
-        CodecRegWrite(baseAddr, AIC31_P0_REG102, 0x08);
-
-        /* Use PLL DIV OUT as codec CLK IN */
-        CodecRegBitClr(baseAddr, AIC31_P0_REG101, 0x01);
-
-        /* Select GPIO to output the divided PLL IN */
-        CodecRegWrite(baseAddr, AIC31_P0_REG98, 0x20);
-
-        temp = (pllJval << 2);
-        CodecRegWrite(baseAddr, AIC31_P0_REG4, temp);
-
-        /* Configure the PLL divide registers */
-        CodecRegWrite(baseAddr, AIC31_P0_REG5, (pllDval >> 6) & 0xFF);
-        CodecRegWrite(baseAddr, AIC31_P0_REG6, (pllDval & 0x3F) << 2);
-
-        temp = pllRval;
-        CodecRegWrite(baseAddr, AIC31_P0_REG11, temp);
-
-        /* Enable the codec to be master for fs and bclk */
-        CodecRegWrite(baseAddr, AIC31_P0_REG8, 0xD0);
-
-        CodecRegWrite(baseAddr, AIC31_P0_REG7, ref);
-        printf("SAMPLE RATE: %d\n", sampleRate);
+        default:
+            fs = 0x00u;
+        break;
     }
-#else
-    /**
-     * \brief   Configures the data format and slot width
-     *
-     * \param   baseAddr     Base Address of the interface connected to AIC31
-     * \param   mode         section of the codec (ADC/DAC) for which the sample
-     *                       rate needs to be configured
-     * \param   sampleRate   Sample rate in samples per second
-     *              mode can take the values \n
-     *                AIC31_MODE_ADC - for selecting ADC \n
-     *                AIC31_MODE_DAC - for selecting DAC \n
-     *                AIC31_MODE_BOTH - for both ADC and DAC \n
-     *              sampleRate can be \n
-     *                 8000, 11025, 16000, 22050, 24000, 32000, 44100,
-     *                 48000 or  96000. \n
-     *          The fs is derived from the equation
-     *                fs = (PLL_IN * [pllJval.pllDval] * pllRval) /(2048 * pllPval).
-     *          So the values are set for PLL_IN = 24576 kHz
-     *
-     * \return  None.
-     *
-     **/
-    void AIC31SampleRateConfig(unsigned int baseAddr, unsigned int mode, unsigned int sampleRate)
-    {
-        unsigned char temp;
-        unsigned char fsDivVal;
-        unsigned char nVal;
-        unsigned char mVal = 8;
-        unsigned short osrVal = 128;
-        unsigned char ref = 0x0A;
-        unsigned char pllPval = 1;
-        unsigned char pllRval = 1;
-        unsigned char pllJval = 7;
-        unsigned short pllDval = 5264;
 
+    temp = (mode & fs);
 
-        /* Select the configuration for the given sampling rate */
-        /* Select the configuration for the given sampling rate */
-        switch(sampleRate)
-        {
-            case 8000:
-                pllJval = 8u;
-                pllDval = 1920u;
-                fsDivVal = 6;
-                break;
+    /* Set the sample Rate */
+    CodecRegWrite(baseAddr, AIC31_P0_REG2, temp);
 
-            case 11025:
-                ref = 0x8Au;
-                fsDivVal = 4;
-                break;
+    CodecRegWrite(baseAddr, AIC31_P0_REG3, 0xA0 | pllPval);
 
-            case 16000:
-                pllJval = 8u;
-                pllDval = 1920u;
-                fsDivVal = 3;
-                break;
+    /* use PLL_CLK_IN as MCLK */
+    CodecRegWrite(baseAddr, AIC31_P0_REG102, 0x02);
 
-            case 22050:
-                ref = 0x8Au;
-                fsDivVal = 2;
-                break;
+    /* Use CLKDIV_OUT as codec CLK IN */
+    CodecRegWrite(baseAddr, AIC31_P0_REG101, 0x01);
 
-            case 24000:
-                pllJval = 8u;
-                pllDval = 1920u;
-                fsDivVal = 2;
-                break;
+    /* Select GPIO to output the divided PLL IN */
+    //CodecRegWrite(baseAddr, AIC31_P0_REG98, 0x20);
+    /*
+    temp = (pllJval << 2);
+    CodecRegWrite(baseAddr, AIC31_P0_REG4, temp); */
 
-            case 44100:
-                ref = 0x8Au;
-                fsDivVal = 1;
-                break;
+    /* Configure the PLL divide registers */
+    /* CodecRegWrite(baseAddr, AIC31_P0_REG5, (pllDval >> 6) & 0xFF);
+    CodecRegWrite(baseAddr, AIC31_P0_REG6, (pllDval & 0x3F) << 2);
 
-            case 48000:
-                pllJval = 8u;
-                pllDval = 1920u;
-                fsDivVal = 1;
-                break;
-                
-            default:
-                fsDivVal = 1;
-                break;
-        }
+    temp = pllRval;
+    CodecRegWrite(baseAddr, AIC31_P0_REG11, temp); */
 
-        /* Set the sample Rate */
-        fsDivVal = (fsDivVal-1)<<1;
-        temp = ( mode & ((fsDivVal<<0) | (fsDivVal<<4)) );
-        /* Set the sample Rate */
-        CodecRegWrite(baseAddr, AIC31_P0_REG2, temp);
+    /* Enable the codec to be master for fs and bclk */
+    CodecRegWrite(baseAddr, AIC31_P0_REG8, 0xD0);
 
-        CodecRegWrite(baseAddr, AIC31_P0_REG3, 0x80 | pllPval);
-
-        /* use PLL_CLK_IN as MCLK */
-        CodecRegWrite(baseAddr, AIC31_P0_REG102, 0x08);
-
-        /* Use PLL DIV OUT as codec CLK IN */
-        // CodecRegBitClr(baseAddr, AIC31_P0_REG101, 0x01);
-        CodecRegWrite(baseAddr, AIC31_P0_REG101, 0xC0);
-
-        /* Select GPIO to output the divided PLL IN */
-        // CodecRegWrite(baseAddr, AIC31_P0_REG98, 0x20);
-
-        temp = (pllJval << 2);
-        CodecRegWrite(baseAddr, AIC31_P0_REG4, temp);
-
-        /* Configure the PLL divide registers */
-        CodecRegWrite(baseAddr, AIC31_P0_REG5, (pllDval >> 6) & 0xFF);
-        CodecRegWrite(baseAddr, AIC31_P0_REG6, (pllDval & 0x3F) << 2);
-
-        temp = pllRval;
-        CodecRegWrite(baseAddr, AIC31_P0_REG11, temp);
-
-        /* Enable the codec to be master for fs and bclk */
-        CodecRegWrite(baseAddr, AIC31_P0_REG8, 0xD0);
-
-        CodecRegWrite(baseAddr, AIC31_P0_REG7, ref);
-        printf("SAMPLE RATE: %d\n", sampleRate);
-    }
-#endif
+    CodecRegWrite(baseAddr, AIC31_P0_REG7, ref);
+}
 
 /**
  * \brief   Initializes the ADC section of the AIC31 Codec
@@ -491,17 +366,17 @@ void AIC31ADCInit(unsigned int baseAddr)
     CodecRegWrite(baseAddr, AIC31_P0_REG15, 0x00);
     CodecRegWrite(baseAddr, AIC31_P0_REG16, 0x00);
 
-    /* MIC3L/R is not connected to the left ADC PGA */
-    CodecRegWrite(baseAddr, AIC31_P0_REG17, 0xFF);
+    /* MIC1R is not connected to the left ADC PGA */
+    CodecRegWrite(baseAddr, AIC31_P0_REG17, 0x0F);
 
-    /* MIC3L/R is not connected to the right ADC PGA */
-    CodecRegWrite(baseAddr, AIC31_P0_REG18, 0xFF);
+    /* MIC1L is not connected to the right ADC PGA */
+    CodecRegWrite(baseAddr, AIC31_P0_REG18, 0xF0);
 
     /* power on the Line L1R */
-    CodecRegWrite(baseAddr, AIC31_P0_REG19, 0x04);
+    CodecRegWrite(baseAddr, AIC31_P0_REG19, 0x7C);
 
-    /* power on the Line LIL */
-    CodecRegWrite(baseAddr, AIC31_P0_REG22, 0x04);
+    /* power on the Line L2R */
+    CodecRegWrite(baseAddr, AIC31_P0_REG22, 0x7C);
 }
 
 /**
@@ -515,8 +390,8 @@ void AIC31ADCInit(unsigned int baseAddr)
 void AIC31DACInit(unsigned int baseAddr)
 {
 
-    /* Codec Datapath Setup */
-    CodecRegWrite(baseAddr, AIC31_P0_REG7, 0x8A);
+	/* Codec Datapath Setup */
+	CodecRegWrite(baseAddr, AIC31_P0_REG7, 0x8A);
 
     /* select the DAC L1 R1 Paths */
     CodecRegWrite(baseAddr, AIC31_P0_REG41, 0x02);
@@ -545,7 +420,8 @@ void AIC31DACInit(unsigned int baseAddr)
 
     /* DAC Quiescent Current Adjustment */
     //CodecRegWrite(baseAddr, AIC31_P0_REG109, 0xC0);
-    /* power up the left and right DACs */
+
+	/* power up the left and right DACs */
     CodecRegWrite(baseAddr, AIC31_P0_REG37, 0xE0);
 }
 
